@@ -22,13 +22,7 @@
 - [🧾 Estilo profesional](#-estilo-profesional)
 - [🌐 Estilo cyber / neon](#-estilo-cyber--neon)
 - [🏗️ Arquitectura](#-arquitectura)
-- [🔄 Flujo de generación](#-flujo-de-generación)
-- [📁 Estructura](#-estructura)
-- [📦 API principal](#-api-principal)
-- [🛠️ Instalación](#-instalación)
-- [🚀 Uso CLI](#-uso-cli)
-- [📖 Ejemplos](#-ejemplos)
-- [📖 Todo](#-todo)
+
 
 ---
 
