@@ -53,10 +53,9 @@
 ```python
 generate_pdf(style="professional", data=data, output_path="out.pdf")
 
-
+```
 <div align="center">
 
 Hecho con Python · ReportLab · Arquitectura modular
-<br>
 
-</div> ```
+</div> 
