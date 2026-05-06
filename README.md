@@ -159,6 +159,6 @@ class CustomStyle(PDFStyleStrategy):
 
 <div align="center">
 
-Hecho con Python · ReportLab · Arquitectura modular
+Python · ReportLab · Modular Architecture
 
 </div> 
