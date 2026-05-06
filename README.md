@@ -55,7 +55,7 @@ A Python module for generating visually distinct PDF documents using ReportLab w
 
 | Professional Style | Dark / Neon / Modern Style |
 |:---:|:---:|
-| ![Professional Preview](sample_professional_preview.png) | ![Cyber Preview](sample_cyber_preview.png) |
+| ![Professional Preview](images/sample_professional_preview.png) | ![Cyber Preview](images/sample_cyber_preview.png) |
 | Clean, minimalistic business documents | Dark-mode aesthetic with refined neon accents |
 
 ## 🎯 Features
