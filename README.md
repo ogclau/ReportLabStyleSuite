@@ -1,5 +1,4 @@
 
-![header](./header.svg)
 
 [![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&size=17&duration=900&pause=120&color=00FFFF&center=true&vCenter=true&width=950&lines=%5B+0.001s+%5D+init+pdf.engine...;%5B+0.032s+%5D+loading+styles...;%5B+0.087s+%5D+professional.theme+ready;%5B+0.142s+%5D+cyber.theme+ready;%5B+0.201s+%5D+layout.system+initialized;%5B+0.248s+%5D+font.registry+loaded;%5B+0.301s+%5D+render.pipeline+online;%5B+0.355s+%5D+table.module+active;%5B+0.402s+%5D+grid.background+enabled;%5B+0.447s+%5D+ascii.renderer+ready;%5B+0.501s+%5D+integrity+check+%5BOK%5D;%5B+0.533s+%5D+style.system+%5BENABLED%5D;%5B+0.600s+%5D+pdf.generator+%3A+READY;%3E+SYSTEM+READY+%C2%B7+RENDER+ENGINE+ONLINE_)](https://git.io/typing-svg)
 
@@ -53,3 +52,11 @@
 
 ```python
 generate_pdf(style="professional", data=data, output_path="out.pdf")
+
+
+<div align="center">
+
+Hecho con Python · ReportLab · Arquitectura modular
+<br>
+
+</div> ```
