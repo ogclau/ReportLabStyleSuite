@@ -9,7 +9,7 @@
 ![PDF](https://img.shields.io/badge/PDF-ReportLab-ff6b6b?style=for-the-badge&labelColor=0d1117)
 ![Styles](https://img.shields.io/badge/Styles-2%20Themes-ff00ff?style=for-the-badge&labelColor=0d1117)
 
-**Generador de PDFs modular — Estilo Profesional · Estilo Cyber · Layout dinámico · CLI · ReportLab**
+**Modular PDF Engine — Professional & Cyber Themes · Dynamic Layout System · CLI Workflow · Built with ReportLab**
 
 </div>
 
