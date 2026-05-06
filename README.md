@@ -30,7 +30,7 @@ A Python module for generating visually distinct PDF documents using ReportLab w
 - [⌨ CLI](#-cli)
 - [🧱 Data Structure](#-data-structure)
 - [🖌 Extending with Custom Styles](#-extending-with-custom-styles)
-- [📑 Requirements](#requirements)
+- [📑 Requirements](#-requirements)
 
 
 ---
