@@ -24,13 +24,13 @@ A Python module for generating visually distinct PDF documents using ReportLab w
 
 - [⚡ Tech Stack](#-tech-stack)
 - [🎨 Style System](#-style-system)
-- [🧾 Features](#-features)
-- [🌐 Installation](#-installation)
-- [🏗️ Usage](#-usage)
-- [🧾 CLI](#-cli)
-- [🌐 Data Structure](#-data-structure)
-- [🏗️ Extending with Custom Styles](#-extending-with-custom-styles)
-- [📚 Requirements](#requirements)
+- [🎯 Features](#-features)
+- [📦 Installation](#-installation)
+- [💻 Usage](#-usage)
+- [⌨ CLI](#-cli)
+- [🧱 Data Structure](#-data-structure)
+- [🖌 Extending with Custom Styles](#-extending-with-custom-styles)
+- [📑 Requirements](#requirements)
 
 
 ---
@@ -133,7 +133,7 @@ python pdf_generator.py professional --data mydata.json -o report.pdf
 }
 ```
 
-## 🎨 Extending with Custom Styles
+## 🖌 Extending with Custom Styles
 
 Create a new style by subclassing `PDFStyleStrategy`:
 
