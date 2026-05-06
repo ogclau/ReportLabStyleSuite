@@ -15,39 +15,148 @@
 
 ---
 
-## 📚 ÍNDICE
+# PDF Document Generator
+```python
+A Python module for generating visually distinct PDF documents using ReportLab with two fully independent visual styles.
+```
 
-- [⚡ Stack tecnológico](#-stack-tecnológico)
-- [🎨 Sistema de estilos](#-sistema-de-estilos)
-- [🧾 Estilo profesional](#-estilo-profesional)
-- [🌐 Estilo cyber / neon](#-estilo-cyber--neon)
-- [🏗️ Arquitectura](#-arquitectura)
+## 📚 INDEX
 
+- [⚡ Tech Stack](#-tech-stack)
+- [🎨 Style System](#-style-system)
+- [🧾 Features](#-features)
+- [🌐 Installation](#-installation)
+- [🏗️ Usage](#-usage)
+- [🧾 CLI](#-cli)
+- [🌐 Data Structure](#-data-structure)
+- [🏗️ Extending with Custom Styles](#-extending-with-custom-styles)
+- [📚 Requirements](#requirements)
 
----
-
-## ⚡ Stack tecnológico
-
-| Capa     | Tech        | Rol                          |
-|----------|------------|------------------------------|
-| Core     | Python 3.10+ | Motor principal              |
-| PDF      | ReportLab  | Renderizado de documentos     |
-| CLI      | argparse   | Generación desde terminal     |
-| Layout   | Custom     | Sistema modular de estilos    |
-| Fonts    | Helvetica / Mono | Tipografía adaptable    |
 
 ---
 
-## 🎨 Sistema de estilos
+## ⚡ Tech Stack
 
-✔️ Arquitectura desacoplada  
-✔️ Patrón Strategy (cada estilo es independiente)  
-✔️ Extensible (fácil añadir nuevos estilos)  
+| Layer     | Tech             | Role                      |
+|-----------|------------------|---------------------------|
+| Core      | Python 3.10+     | Main engine               |
+| PDF       | ReportLab        | Document rendering        |
+| CLI       | argparse         | Terminal-based generation |
+| Layout    | Custom           | Modular style system      |
+| Fonts     | Helvetica / Mono | Adaptable typography      |
+
+---
+
+## 🎨 Style System
+
+✔️ Decoupled architecture
+✔️ Strategy pattern (each style is independent)
+✔️ Extensible (easy to add new styles)
+
+
+## 🎯 Features
+
+- **Professional Style**: Clean, minimalistic layout with Helvetica typography, neutral colors, and structured sections
+- **Cyber Style**: Neon-inspired aesthetic with monospaced fonts, grid backgrounds, and code-block elements
+- **Modular Architecture**: Strategy pattern for easy extension with new styles
+- **Dynamic Field Handling**: Only renders fields that exist in the data
+- **CLI Tool**: Command-line interface for quick PDF generation
+
+## 📦 Installation
+
+```bash
+pip install reportlab
+```
+
+## 💻 Usage
+
+### Python API
 
 ```python
-generate_pdf(style="professional", data=data, output_path="out.pdf")
+from pdf_generator import generate_pdf
 
+data = {
+    "title": "My Document",
+    "subtitle": "A Subtitle",
+    "sections": [
+        {"title": "Section 1", "content": "Some content here"}
+    ]
+}
+
+# Professional style
+generate_pdf("professional", data, "output.pdf")
+
+# Cyber style
+generate_pdf("cyber", data, "output.pdf")
 ```
+
+### ⌨ CLI
+
+```bash
+# Generate professional sample
+python pdf_generator.py professional -o report.pdf
+
+# Generate cyber sample
+python pdf_generator.py cyber -o audit.pdf
+
+# Generate both styles
+python pdf_generator.py both -o samples.pdf
+
+# Use custom data
+python pdf_generator.py professional --data mydata.json -o report.pdf
+```
+
+## 🧱 Data Structure
+
+```python
+{
+    "title": str,              # Document title
+    "subtitle": str,           # Subtitle text
+    "metadata": dict,          # Key-value pairs for header metadata
+    "sections": [              # List of sections
+        {
+            "title": str,      # Section heading
+            "content": str/list # Text or bullet points
+        }
+    ],
+    "table": {                 # Optional data table
+        "headers": list,
+        "data": list of lists
+    },
+    "logo_path": str,          # Path to logo image (PNG/SVG)
+    "logo_alignment": str,     # "left", "center", or "right"
+    "footer_text": str,        # Custom footer text
+    "ascii_art": str,          # ASCII art block (cyber style)
+    "code_blocks": [           # Code blocks (cyber style)
+        {"language": str, "code": str}
+    ]
+}
+```
+
+## 🎨 Extending with Custom Styles
+
+Create a new style by subclassing `PDFStyleStrategy`:
+
+```python
+from pdf_generator import PDFStyleStrategy
+
+class CustomStyle(PDFStyleStrategy):
+    def _setup_styles(self):
+        # Define your styles
+        pass
+
+    def build_header(self, data):
+        # Build header elements
+        pass
+
+    # ... implement other abstract methods
+```
+
+## 📑 Requirements
+
+- Python 3.10+
+- ReportLab 4.0+
+
 <div align="center">
 
 Hecho con Python · ReportLab · Arquitectura modular
