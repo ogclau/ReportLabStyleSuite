@@ -1,168 +1,257 @@
-<div  align="center">
+<div align="center">
 
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&size=17&duration=900&pause=120&color=00FFFF&center=true&vCenter=true&width=950&lines=%5B+0.001s+%5D+init+pdf.engine...;%5B+0.032s+%5D+loading+styles...;%5B+0.087s+%5D+professional.theme+ready;%5B+0.142s+%5D+cyber.theme+ready;%5B+0.201s+%5D+layout.system+initialized;%5B+0.248s+%5D+font.registry+loaded;%5B+0.301s+%5D+render.pipeline+online;%5B+0.355s+%5D+table.module+active;%5B+0.402s+%5D+grid.background+enabled;%5B+0.447s+%5D+ascii.renderer+ready;%5B+0.501s+%5D+integrity+check+%5BOK%5D;%5B+0.533s+%5D+style.system+%5BENABLED%5D;%5B+0.600s+%5D+pdf.generator+%3A+READY;%3E+SYSTEM+READY+%C2%B7+RENDER+ENGINE+ONLINE_)](https://git.io/typing-svg)
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&size=17&duration=900&pause=120&color=00FFFF&center=true&vCenter=true&width=950&lines=%5B+0.001s+%5D+init+pdf.engine...;%5B+0.032s+%5D+loading+styles...;%5B+0.087s+%5D+professional.theme+ready;%5B+0.142s+%5D+dark.neon.theme+ready;%5B+0.201s+%5D+layout.system+initialized;%5B+0.248s+%5D+flask.server+online;%5B+0.301s+%5D+form.studio+loaded;%5B+0.355s+%5D+table.editor+active;%5B+0.402s+%5D+section.builder+ready;%5B+0.447s+%5D+logo.upload+enabled;%5B+0.501s+%5D+integrity+check+%5BOK%5D;%5B+0.533s+%5D+style.system+%5BENABLED%5D;%5B+0.600s+%5D+pdf.studio+%3A+READY;%3E+SYSTEM+READY+%C2%B7+RENDER+ENGINE+ONLINE_)](https://git.io/typing-svg)
 
-#  PDF STYLE ENGINE · v1.0
+# PDF STYLE ENGINE · v2.0
 
 ![Status](https://img.shields.io/badge/STATUS-ACTIVO-00ffff?style=for-the-badge&labelColor=0d1117)
 ![Python](https://img.shields.io/badge/Python-3.10+-ffd700?style=for-the-badge&labelColor=0d1117)
 ![PDF](https://img.shields.io/badge/PDF-ReportLab-ff6b6b?style=for-the-badge&labelColor=0d1117)
+![Flask](https://img.shields.io/badge/Web-Flask-39ff6e?style=for-the-badge&labelColor=0d1117)
 ![Styles](https://img.shields.io/badge/Styles-2%20Themes-ff00ff?style=for-the-badge&labelColor=0d1117)
 
-**Modular PDF Engine — Professional & Cyber Themes · Dynamic Layout System · CLI Workflow · Built with ReportLab**
+**Modular PDF Engine · Professional & Dark Neon Themes · Dynamic Web Form Studio · Flask Server · Built with ReportLab**
 
 </div>
 
 ---
 
-# PDF Document Generator
-```python
-A Python module for generating visually distinct PDF documents using ReportLab with two fully independent visual styles.
-```
-
 ## 📚 INDEX
 
 - [⚡ Tech Stack](#-tech-stack)
 - [🎨 Style System](#-style-system)
+- [🗂 Project Structure](#-project-structure)
 - [🎯 Features](#-features)
 - [📦 Installation](#-installation)
-- [💻 Usage](#-usage)
+- [🌐 Web Form Studio](#-web-form-studio)
+- [💻 Python API](#-python-api)
 - [⌨ CLI](#-cli)
 - [🧱 Data Structure](#-data-structure)
 - [🖌 Extending with Custom Styles](#-extending-with-custom-styles)
 - [📑 Requirements](#-requirements)
 
-
 ---
 
 ## ⚡ Tech Stack
 
-| Layer     | Tech             | Role                      |
-|-----------|------------------|---------------------------|
-| Core      | Python 3.10+     | Main engine               |
-| PDF       | ReportLab        | Document rendering        |
-| CLI       | argparse         | Terminal-based generation |
-| Layout    | Custom           | Modular style system      |
-| Fonts     | Helvetica / Mono | Adaptable typography      |
+| Layer      | Tech             | Role                            |
+|------------|------------------|---------------------------------|
+| Core       | Python 3.10+     | PDF generation engine           |
+| PDF        | ReportLab        | Document rendering              |
+| Web Server | Flask            | Local form server               |
+| Frontend   | HTML + Vanilla JS| Interactive form UI             |
+| CLI        | argparse         | Terminal-based generation       |
+| Layout     | Custom           | Modular strategy pattern        |
+| Fonts      | Helvetica        | Clean adaptive typography       |
 
 ---
 
 ## 🎨 Style System
 
-✔️ Decoupled architecture
-✔️ Strategy pattern (each style is independent)
-✔️ Extensible (easy to add new styles)
+✔️ Decoupled architecture — each style is fully independent
+✔️ Strategy pattern — swap or extend styles without touching the core
+✔️ Dynamic rendering — missing fields are silently omitted, no blank gaps
 
-| Professional Style | Dark / Neon / Modern Style |
+| Professional | Dark Neon |
 |:---:|:---:|
 | ![Professional Preview](images/sample_professional_preview.png) | ![Cyber Preview](images/sample_cyber_preview.png) |
-| Clean, minimalistic business documents | Dark-mode aesthetic with refined neon accents |
+| Clean corporate layout · Helvetica · neutral palette · optional logo | Charcoal dark · electric green accents · dot grid · minimalist neon |
+
+---
+
+## 🗂 Project Structure
+
+```
+pdf_generator/
+│
+├── pdf_generator.py       # Core engine — ProfessionalStyle + CyberStyle
+├── form_app.py            # Flask server — serves the form & calls the engine
+├── form.html              # Interactive web form UI (single-file, no deps)
+├── generate_samples.py    # CLI tool + example data for both styles
+│
+└── output/
+    ├── sample_professional.pdf
+    └── sample_cyber.pdf
+```
+
+---
 
 ## 🎯 Features
 
-- **Professional Style**: Clean, minimalistic layout with Helvetica typography, neutral colors, and structured sections
-- **Cyber Style**: Neon-inspired aesthetic with monospaced fonts, grid backgrounds, and code-block elements
-- **Modular Architecture**: Strategy pattern for easy extension with new styles
-- **Dynamic Field Handling**: Only renders fields that exist in the data
-- **CLI Tool**: Command-line interface for quick PDF generation
+### PDF Engine (`pdf_generator.py`)
+- **Professional Style** — wide margins, Helvetica hierarchy, accent blue `#007ACC`, optional logo upload, alternating table rows, clean section separators, page-aware overflow
+- **Dark Neon Style** — deep charcoal `#0D0D0D`, electric green `#39FF6E` accents, subtle dot-grid background, left-edge neon stripe, surface card sections, neon-ruled table, ASCII art block, SHA-256 footer hash
+- **Deterministic output** — same data always produces identical bytes
+- **Dynamic fields** — every key is optional; absent fields produce zero blank space
+
+### Web Form Studio (`form_app.py` + `form.html`)
+- **5-panel sidebar navigation** — Style, Metadata, Sections, Table, ASCII Art
+- **Live style selector** — visual card toggle between Professional and Dark Neon
+- **Logo upload** — drag & drop PNG/JPG, live preview before generating
+- **Dynamic section builder** — add/remove/reorder content sections on the fly
+- **Inline table editor** — add/remove columns and rows, first row auto-treated as header
+- **One-click generate & download** — PDF streams directly to the browser, no page reload
+- **Zero frontend dependencies** — pure HTML + Vanilla JS, no npm, no CDN
+
+---
 
 ## 📦 Installation
 
 ```bash
-pip install reportlab
+pip install reportlab flask
 ```
 
-## 💻 Usage
+---
 
-### Python API
+## 🌐 Web Form Studio
+
+The fastest way to create fully customised PDFs — fill a form, click generate, download.
+
+```bash
+python form_app.py
+```
+
+Then open **[http://localhost:5050](http://localhost:5050)** in your browser.
+
+### Form panels
+
+| Panel | Fields |
+|---|---|
+| 🎨 **Style** | Theme selector (Professional / Dark Neon) · Logo upload |
+| 📋 **Metadata** | Title · Subtitle · Date · Reference ID · Company · Contact · Hash ID |
+| 📝 **Sections** | Unlimited sections — each with heading + free-text body |
+| 📊 **Table** | Live cell editor · add/remove rows and columns dynamically |
+| 🌑 **ASCII Art** | Monospaced art block (Dark Neon style only) |
+
+> All fields are optional. Empty fields are automatically omitted from the final PDF.
+
+---
+
+## 💻 Python API
 
 ```python
 from pdf_generator import generate_pdf
 
 data = {
-    "title": "My Document",
-    "subtitle": "A Subtitle",
+    "title":     "Annual Technology Review 2025",
+    "subtitle":  "Strategic Infrastructure Assessment",
+    "date":      "2025-05-06",
+    "reference": "TEC-2025-0042",
+    "company":   "Nexus Consulting Group",
+    "contact":   "info@nexus.io · +1 800 555 0199",
     "sections": [
-        {"title": "Section 1", "content": "Some content here"}
-    ]
+        {
+            "heading": "Executive Summary",
+            "body": "Cloud adoption accelerated by 34% YoY..."
+        }
+    ],
+    "table": {
+        "headers": ["System", "Status", "Coverage"],
+        "rows": [
+            ["AWS Cloud",   "Operational", "100%"],
+            ["On-Prem K8s", "Degraded",    "94%"],
+        ]
+    }
 }
 
 # Professional style
-generate_pdf("professional", data, "output.pdf")
+generate_pdf("professional", data, "report.pdf")
 
-# Cyber style
-generate_pdf("cyber", data, "output.pdf")
+# Dark Neon style
+generate_pdf("cyber", data, "report_dark.pdf")
 ```
 
-### ⌨ CLI
+---
+
+## ⌨ CLI
 
 ```bash
-# Generate professional sample
-python pdf_generator.py professional -o report.pdf
+# Generate both sample PDFs
+python generate_samples.py
 
-# Generate cyber sample
-python pdf_generator.py cyber -o audit.pdf
+# Generate a single style
+python generate_samples.py --style professional
+python generate_samples.py --style cyber
 
-# Generate both styles
-python pdf_generator.py both -o samples.pdf
-
-# Use custom data
-python pdf_generator.py professional --data mydata.json -o report.pdf
+# Custom output directory
+python generate_samples.py --out /path/to/folder
 ```
+
+---
 
 ## 🧱 Data Structure
 
+All keys are optional. Fields not present in the dict are silently skipped.
+
 ```python
 {
-    "title": str,              # Document title
-    "subtitle": str,           # Subtitle text
-    "metadata": dict,          # Key-value pairs for header metadata
-    "sections": [              # List of sections
+    # ── Header / Metadata ──────────────────────────────────────
+    "title":       str,   # Main document title
+    "subtitle":    str,   # Secondary headline
+    "date":        str,   # Date string shown in header
+    "reference":   str,   # Reference / document ID
+    "company":     str,   # Company or author name (footer)
+    "contact":     str,   # Contact info line (footer)
+
+    # ── Professional only ──────────────────────────────────────
+    "logo_path":   str,   # Absolute path to a PNG/JPG logo
+
+    # ── Dark Neon only ─────────────────────────────────────────
+    "hash_id":     str,   # Footer hash ID (auto SHA-256 if omitted)
+    "ascii_art":   str,   # Pre-formatted ASCII art block
+
+    # ── Content ────────────────────────────────────────────────
+    "sections": [
         {
-            "title": str,      # Section heading
-            "content": str/list # Text or bullet points
+            "heading": str,   # Section title (optional)
+            "body":    str,   # Section body text (auto word-wrapped)
         }
     ],
-    "table": {                 # Optional data table
-        "headers": list,
-        "data": list of lists
-    },
-    "logo_path": str,          # Path to logo image (PNG/SVG)
-    "logo_alignment": str,     # "left", "center", or "right"
-    "footer_text": str,        # Custom footer text
-    "ascii_art": str,          # ASCII art block (cyber style)
-    "code_blocks": [           # Code blocks (cyber style)
-        {"language": str, "code": str}
-    ]
+
+    # ── Table ──────────────────────────────────────────────────
+    "table": {
+        "headers": ["Col A", "Col B", "Col C"],
+        "rows": [
+            ["val1", "val2", "val3"],
+        ]
+    }
 }
 ```
 
+---
+
 ## 🖌 Extending with Custom Styles
 
-Create a new style by subclassing `PDFStyleStrategy`:
+Subclass `BaseStyle` and register it under any name:
 
 ```python
-from pdf_generator import PDFStyleStrategy
+from pdf_generator import BaseStyle, register_style
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
-class CustomStyle(PDFStyleStrategy):
-    def _setup_styles(self):
-        # Define your styles
-        pass
+class RetroStyle(BaseStyle):
+    def build(self, output_path: str) -> None:
+        c = canvas.Canvas(output_path, pagesize=A4)
+        # your drawing logic here
+        c.save()
 
-    def build_header(self, data):
-        # Build header elements
-        pass
-
-    # ... implement other abstract methods
+# Register and use like any built-in style
+register_style("retro", RetroStyle)
+generate_pdf("retro", data, "retro_doc.pdf")
 ```
+
+---
 
 ## 📑 Requirements
 
 - Python 3.10+
 - ReportLab 4.0+
+- Flask 3.0+ *(only required for the web form)*
+
+---
 
 <div align="center">
 
-Python · ReportLab · Modular Architecture
+Python · ReportLab · Flask · Modular Architecture
 
-</div> 
+</div>
