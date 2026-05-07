@@ -251,7 +251,9 @@ generate_pdf("retro", data, "retro_doc.pdf")
 ---
 
 <div align="center">
-
+    
+![Visitors](https://hits.sh/github.com/ogclau/ReportLabStyleSuite.svg?style=for-the-badge&color=39ff6e&labelColor=0d1117)
+    
 Python · ReportLab · Flask · Modular Architecture
 
 </div>
