@@ -1,1003 +1,740 @@
 """
-PDF Document Generator with Dual Visual Styles
-===============================================
-A modular PDF generation engine supporting Professional and Cyber/Neon styles.
-Compatible with Python 3.10+
+pdf_generator.py
+================
+A modular PDF generation engine with two fully independent visual styles:
+  - "professional": Clean, minimalistic corporate layout
+  - "cyber":        Neon/cyberpunk code-aesthetic layout
 
-Usage:
-    from pdf_generator import generate_pdf, ProfessionalStyle, CyberStyle
+Entry point
+-----------
+    generate_pdf(style, data, output_path)
 
-    # Professional style
-    generate_pdf("professional", data, "output.pdf")
+Supported styles
+----------------
+    "professional"  →  ProfessionalStyle
+    "cyber"         →  CyberStyle
 
-    # Cyber style  
-    generate_pdf("cyber", data, "output.pdf")
+Data dict keys (all optional unless noted)
+------------------------------------------
+    title           str   – Main document title
+    subtitle        str   – Secondary headline
+    date            str   – Date string shown in header
+    reference       str   – Reference / document ID
+    company         str   – Company or author name
+    logo_path       str   – Absolute path to a PNG logo (professional only)
+    contact         str   – Footer contact line
+    sections        list  – [{"heading": str, "body": str}, ...]
+    table           dict  – {"headers": [...], "rows": [[...], ...]}
+    ascii_art       str   – Pre-formatted ASCII block (cyber only)
+    hash_id         str   – Hash-like ID for cyber footer
 """
 
-import os
-import sys
-import json
+from __future__ import annotations
+
 import hashlib
-import datetime
+import math
+import os
+import time
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.units import inch, mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, Image, HRFlowable, KeepTogether
-)
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.graphics.shapes import Drawing, Rect, Line, String
-from reportlab.graphics import renderPDF
+from reportlab.platypus import (
+    BaseDocTemplate,
+    Frame,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+W, H = A4  # 595.27 x 841.89 pts
 
 
-# =============================================================================
-# DATA MODELS
-# =============================================================================
-
-@dataclass
-class PDFData:
-    """Structured data container for PDF generation."""
-    title: Optional[str] = None
-    subtitle: Optional[str] = None
-    metadata: Dict[str, str] = field(default_factory=dict)
-    sections: List[Dict[str, Any]] = field(default_factory=list)
-    table: Optional[Dict[str, Any]] = None
-    logo_path: Optional[str] = None
-    logo_alignment: str = "left"  # "left", "center", "right"
-    footer_text: Optional[str] = None
-    ascii_art: Optional[str] = None
-    code_blocks: List[Dict[str, str]] = field(default_factory=list)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'PDFData':
-        """Create PDFData from dictionary, filtering None values."""
-        valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-        return cls(**valid_fields)
+def _hex(h: str) -> colors.HexColor:
+    return colors.HexColor(h)
 
 
-# =============================================================================
-# STYLE STRATEGY INTERFACE
-# =============================================================================
+def _safe(data: dict, key: str, default: Any = None) -> Any:
+    """Return data[key] only when it's a non-empty string (or truthy value)."""
+    v = data.get(key, default)
+    if isinstance(v, str):
+        return v.strip() or default
+    return v
 
-class PDFStyleStrategy(ABC):
-    """Abstract base class for PDF styling strategies."""
 
-    def __init__(self, pagesize=A4):
-        self.pagesize = pagesize
-        self.width, self.height = pagesize
-        self.styles = getSampleStyleSheet()
-        self._setup_styles()
+# ---------------------------------------------------------------------------
+# Abstract base style
+# ---------------------------------------------------------------------------
+
+class BaseStyle(ABC):
+    """Strategy interface.  Each concrete style handles its own canvas drawing."""
+
+    def __init__(self, data: dict):
+        self.data = data
 
     @abstractmethod
-    def _setup_styles(self):
-        """Initialize custom paragraph styles."""
-        pass
-
-    @abstractmethod
-    def build_header(self, data: PDFData) -> List:
-        """Build header elements."""
-        pass
-
-    @abstractmethod
-    def build_sections(self, data: PDFData) -> List:
-        """Build section content elements."""
-        pass
-
-    @abstractmethod
-    def build_table(self, data: PDFData) -> List:
-        """Build table elements if data exists."""
-        pass
-
-    @abstractmethod
-    def build_footer_canvas(self, canvas_obj, doc, data: PDFData):
-        """Draw footer on canvas."""
-        pass
-
-    @abstractmethod
-    def build_background(self, canvas_obj, doc):
-        """Draw page background elements."""
-        pass
-
-    def filter_empty(self, items: List) -> List:
-        """Remove None/empty items from list."""
-        return [item for item in items if item is not None]
-
-    def safe_paragraph(self, text: Optional[str], style_name: str, 
-                       default: str = "") -> Optional[Paragraph]:
-        """Create paragraph only if text exists."""
-        if not text:
-            return None
-        return Paragraph(text, self.styles[style_name])
+    def build(self, output_path: str) -> None:
+        ...
 
 
-# =============================================================================
-# PROFESSIONAL / MINIMALISTIC STYLE
-# =============================================================================
+# ===========================================================================
+# 1.  PROFESSIONAL / MINIMALISTIC STYLE
+# ===========================================================================
 
-class ProfessionalStyle(PDFStyleStrategy):
+class ProfessionalStyle(BaseStyle):
     """
-    Clean, modern layout with wide spacing and strong visual hierarchy.
-    Neutral color palette with optional company branding.
+    Clean, modern layout.
+    Palette: #1A1A1A  #4A4A4A  #EAEAEA  #007ACC
     """
 
-    # Color Palette
-    COLORS = {
-        'primary': colors.HexColor('#1A1A1A'),
-        'secondary': colors.HexColor('#4A4A4A'),
-        'accent': colors.HexColor('#007ACC'),
-        'light': colors.HexColor('#EAEAEA'),
-        'white': colors.white,
-        'border': colors.HexColor('#CCCCCC')
-    }
+    # --- palette ---
+    C_DARK   = _hex("#1A1A1A")
+    C_MID    = _hex("#4A4A4A")
+    C_LIGHT  = _hex("#EAEAEA")
+    C_ACCENT = _hex("#007ACC")
+    C_WHITE  = colors.white
+    C_ALT_ROW = _hex("#F5F8FB")
 
-    def _setup_styles(self):
-        """Configure typography and spacing."""
-        self.styles.add(ParagraphStyle(
-            name='ProfTitle',
-            fontName='Helvetica-Bold',
-            fontSize=20,
-            leading=26,
-            textColor=self.COLORS['primary'],
-            spaceAfter=6,
-            alignment=TA_LEFT
-        ))
+    # --- layout ---
+    MARGIN_X = 18 * mm
+    MARGIN_Y = 16 * mm
+    HEADER_H = 28 * mm
+    FOOTER_H = 14 * mm
 
-        self.styles.add(ParagraphStyle(
-            name='ProfSubtitle',
-            fontName='Helvetica',
-            fontSize=13,
-            leading=18,
-            textColor=self.COLORS['secondary'],
-            spaceAfter=20,
-            alignment=TA_LEFT
-        ))
+    def build(self, output_path: str) -> None:
+        c = canvas.Canvas(output_path, pagesize=A4)
+        c.setTitle(_safe(self.data, "title", "Document"))
 
-        self.styles.add(ParagraphStyle(
-            name='ProfBody',
-            fontName='Helvetica',
-            fontSize=10.5,
-            leading=15,
-            textColor=self.COLORS['primary'],
-            spaceAfter=12,
-            alignment=TA_LEFT
-        ))
+        page_num = [0]
 
-        self.styles.add(ParagraphStyle(
-            name='ProfSectionTitle',
-            fontName='Helvetica-Bold',
-            fontSize=12,
-            leading=16,
-            textColor=self.COLORS['accent'],
-            spaceAfter=8,
-            spaceBefore=16,
-            alignment=TA_LEFT
-        ))
+        def draw_page(c: canvas.Canvas) -> None:
+            page_num[0] += 1
+            self._draw_header(c)
+            self._draw_footer(c, page_num[0])
 
-        self.styles.add(ParagraphStyle(
-            name='ProfMeta',
-            fontName='Helvetica',
-            fontSize=9,
-            leading=12,
-            textColor=self.COLORS['secondary'],
-            alignment=TA_RIGHT
-        ))
+        # ---- build content area ----
+        content_y = H - self.HEADER_H - self.MARGIN_Y
+        draw_page(c)
+        content_y = self._draw_body(c, content_y, draw_page)
 
-        self.styles.add(ParagraphStyle(
-            name='ProfFooter',
-            fontName='Helvetica',
-            fontSize=8,
-            leading=10,
-            textColor=self.COLORS['secondary'],
-            alignment=TA_CENTER
-        ))
+        c.save()
 
-    def build_header(self, data: PDFData) -> List:
-        """Build professional header with logo, title, and metadata."""
-        elements = []
+    # ------------------------------------------------------------------
+    def _draw_header(self, c: canvas.Canvas) -> None:
+        mx, hy = self.MARGIN_X, self.HEADER_H
 
-        # Logo handling
-        if data.logo_path and os.path.exists(data.logo_path):
-            img = Image(data.logo_path, width=1.2*inch, height=0.6*inch)
-            if data.logo_alignment == "center":
-                img.hAlign = 'CENTER'
-            elif data.logo_alignment == "right":
-                img.hAlign = 'RIGHT'
-            elements.append(img)
-            elements.append(Spacer(1, 12))
+        # Accent bar at very top
+        c.setFillColor(self.C_ACCENT)
+        c.rect(0, H - 6, W, 6, fill=1, stroke=0)
 
-        # Title and subtitle
-        title = self.safe_paragraph(data.title, 'ProfTitle')
+        # Logo
+        logo = _safe(self.data, "logo_path")
+        logo_right = self.MARGIN_X  # track where logo ends (for title offset)
+        if logo and os.path.isfile(logo):
+            try:
+                c.drawImage(logo, mx, H - hy + 4 * mm,
+                            width=22 * mm, height=14 * mm,
+                            preserveAspectRatio=True, mask="auto")
+                logo_right = mx + 26 * mm
+            except Exception:
+                pass
+
+        # Title
+        title = _safe(self.data, "title")
         if title:
-            elements.append(title)
-
-        subtitle = self.safe_paragraph(data.subtitle, 'ProfSubtitle')
-        if subtitle:
-            elements.append(subtitle)
-
-        # Metadata line
-        if data.metadata:
-            meta_items = []
-            for key, value in data.metadata.items():
-                if value:
-                    meta_items.append(f"<b>{key}:</b> {value}")
-            if meta_items:
-                meta_text = " | ".join(meta_items)
-                meta = Paragraph(meta_text, self.styles['ProfMeta'])
-                elements.append(meta)
-
-        # Separator
-        elements.append(Spacer(1, 8))
-        elements.append(HRFlowable(
-            width="100%", 
-            thickness=1, 
-            color=self.COLORS['light'],
-            spaceBefore=6, 
-            spaceAfter=6
-        ))
-
-        return self.filter_empty(elements)
-
-    def build_sections(self, data: PDFData) -> List:
-        """Build section blocks with subtle separators."""
-        elements = []
-
-        for section in data.sections:
-            if not section:
-                continue
-
-            section_elements = []
-
-            # Section title
-            title_text = section.get('title')
-            if title_text:
-                section_elements.append(
-                    Paragraph(title_text, self.styles['ProfSectionTitle'])
-                )
-
-            # Section content
-            content = section.get('content')
-            if content:
-                if isinstance(content, list):
-                    for item in content:
-                        if item:
-                            section_elements.append(
-                                Paragraph(f"• {item}", self.styles['ProfBody'])
-                            )
-                else:
-                    section_elements.append(
-                        Paragraph(str(content), self.styles['ProfBody'])
-                    )
-
-            # Subtle separator between sections
-            if section_elements:
-                section_elements.append(Spacer(1, 4))
-                section_elements.append(HRFlowable(
-                    width="100%",
-                    thickness=0.5,
-                    color=self.COLORS['light'],
-                    spaceBefore=4,
-                    spaceAfter=4
-                ))
-                elements.append(KeepTogether(section_elements))
-
-        return elements
-
-    def build_table(self, data: PDFData) -> List:
-        """Build clean table with alternating row backgrounds."""
-        if not data.table:
-            return []
-
-        table_data = data.table.get('data', [])
-        headers = data.table.get('headers', [])
-
-        if not table_data and not headers:
-            return []
-
-        # Prepare table data
-        if headers:
-            display_data = [headers] + table_data
-        else:
-            display_data = table_data
-
-        if not display_data:
-            return []
-
-        # Calculate column widths
-        num_cols = len(display_data[0]) if display_data else 1
-        col_width = (self.width - 2*inch) / num_cols
-
-        table = Table(display_data, colWidths=[col_width]*num_cols)
-
-        # Table styling
-        style_commands = [
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('TEXTCOLOR', (0, 0), (-1, 0), self.COLORS['white']),
-            ('BACKGROUND', (0, 0), (-1, 0), self.COLORS['accent']),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 0.5, self.COLORS['border']),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), 
-             [self.COLORS['white'], self.COLORS['light']]),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-        ]
-
-        table.setStyle(TableStyle(style_commands))
-
-        return [Spacer(1, 20), table, Spacer(1, 20)]
-
-    def build_background(self, canvas_obj, doc):
-        """Clean white background - no decoration for professional style."""
-        canvas_obj.setFillColor(self.COLORS['white'])
-        canvas_obj.rect(0, 0, self.width, self.height, fill=1, stroke=0)
-
-    def build_footer_canvas(self, canvas_obj, doc, data: PDFData):
-        """Draw professional footer with page number."""
-        canvas_obj.saveState()
-        canvas_obj.setFont('Helvetica', 8)
-        canvas_obj.setFillColor(self.COLORS['secondary'])
-
-        # Page number
-        page_text = f"Page {doc.page}"
-        canvas_obj.drawRightString(self.width - 0.75*inch, 0.5*inch, page_text)
-
-        # Footer text
-        if data.footer_text:
-            canvas_obj.drawString(0.75*inch, 0.5*inch, data.footer_text)
-        else:
-            # Default contact info placeholder
-            canvas_obj.drawString(0.75*inch, 0.5*inch, 
-                                "Confidential Document")
-
-        # Bottom line
-        canvas_obj.setStrokeColor(self.COLORS['light'])
-        canvas_obj.setLineWidth(0.5)
-        canvas_obj.line(0.75*inch, 0.65*inch, 
-                       self.width - 0.75*inch, 0.65*inch)
-
-        canvas_obj.restoreState()
-
-
-# =============================================================================
-# CYBER / NEON / CODE STYLE
-# =============================================================================
-
-class CyberStyle(PDFStyleStrategy):
-    """
-    Cyberpunk-inspired visual theme with neon colors, grid backgrounds,
-    and monospaced typography.
-    """
-
-    # Color Palette
-    COLORS = {
-        'bg': colors.HexColor('#000000'),
-        'bg_alt': colors.HexColor('#111111'),
-        'cyan': colors.HexColor('#00FFFF'),
-        'magenta': colors.HexColor('#FF00FF'),
-        'green': colors.HexColor('#00FF00'),
-        'white': colors.HexColor('#FFFFFF'),
-        'gray': colors.HexColor('#333333'),
-        'dark_gray': colors.HexColor('#1A1A1A')
-    }
-
-    def _setup_styles(self):
-        """Configure monospaced typography."""
-        # Try to use monospaced fonts, fallback to Courier
-        self.mono_font = 'Courier'
-        self.mono_bold = 'Courier-Bold'
-
-        self.styles.add(ParagraphStyle(
-            name='CyberTitle',
-            fontName=self.mono_bold,
-            fontSize=22,
-            leading=28,
-            textColor=self.COLORS['cyan'],
-            spaceAfter=8,
-            alignment=TA_LEFT,
-            fontEncoding='utf-8'
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='CyberSubtitle',
-            fontName=self.mono_font,
-            fontSize=12,
-            leading=16,
-            textColor=self.COLORS['magenta'],
-            spaceAfter=20,
-            alignment=TA_LEFT
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='CyberBody',
-            fontName=self.mono_font,
-            fontSize=9,
-            leading=14,
-            textColor=self.COLORS['white'],
-            spaceAfter=10,
-            alignment=TA_LEFT
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='CyberSectionTitle',
-            fontName=self.mono_bold,
-            fontSize=11,
-            leading=15,
-            textColor=self.COLORS['green'],
-            spaceAfter=6,
-            spaceBefore=14,
-            alignment=TA_LEFT
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='CyberCode',
-            fontName=self.mono_font,
-            fontSize=8,
-            leading=12,
-            textColor=self.COLORS['cyan'],
-            leftIndent=20,
-            spaceAfter=8,
-            alignment=TA_LEFT
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='CyberMeta',
-            fontName=self.mono_font,
-            fontSize=8,
-            leading=11,
-            textColor=self.COLORS['gray'],
-            alignment=TA_RIGHT
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='CyberFooter',
-            fontName=self.mono_font,
-            fontSize=7,
-            leading=10,
-            textColor=self.COLORS['gray'],
-            alignment=TA_CENTER
-        ))
-
-    def _generate_hash_id(self) -> str:
-        """Generate a hash-like ID for cyber aesthetic."""
-        timestamp = datetime.datetime.now().isoformat()
-        return hashlib.md5(timestamp.encode()).hexdigest()[:16].upper()
-
-    def build_header(self, data: PDFData) -> List:
-        """Build cyber header with glitch-style title."""
-        elements = []
-
-        # Neon frame top
-        elements.append(Spacer(1, 4))
-
-        # Title with cyber prefix
-        if data.title:
-            cyber_title = f">>> {data.title}"
-            elements.append(Paragraph(cyber_title, self.styles['CyberTitle']))
+            c.setFont("Helvetica-Bold", 18)
+            c.setFillColor(self.C_DARK)
+            c.drawString(logo_right, H - 14 * mm, title)
 
         # Subtitle
-        subtitle = self.safe_paragraph(data.subtitle, 'CyberSubtitle')
+        subtitle = _safe(self.data, "subtitle")
         if subtitle:
-            elements.append(subtitle)
+            c.setFont("Helvetica", 12)
+            c.setFillColor(self.C_MID)
+            c.drawString(logo_right, H - 20 * mm, subtitle)
 
-        # Metadata in code style
-        if data.metadata:
-            meta_lines = []
-            for key, value in data.metadata.items():
-                if value:
-                    meta_lines.append(f"[{key.upper()}] => {value}")
-            if meta_lines:
-                meta_text = "<br/>".join(meta_lines)
-                elements.append(Paragraph(meta_text, self.styles['CyberMeta']))
+        # Right-side meta: date + reference
+        right_x = W - self.MARGIN_X
+        meta_y   = H - 13 * mm
+        date_str = _safe(self.data, "date")
+        ref_str  = _safe(self.data, "reference")
+        if date_str:
+            c.setFont("Helvetica", 9)
+            c.setFillColor(self.C_MID)
+            c.drawRightString(right_x, meta_y, date_str)
+            meta_y -= 5 * mm
+        if ref_str:
+            c.setFont("Helvetica", 9)
+            c.setFillColor(self.C_MID)
+            c.drawRightString(right_x, meta_y, f"Ref: {ref_str}")
 
         # Separator line
-        elements.append(Spacer(1, 8))
-        elements.append(HRFlowable(
-            width="100%",
-            thickness=1,
-            color=self.COLORS['cyan'],
-            spaceBefore=6,
-            spaceAfter=6
-        ))
+        c.setStrokeColor(self.C_LIGHT)
+        c.setLineWidth(1.2)
+        c.line(self.MARGIN_X, H - hy, W - self.MARGIN_X, H - hy)
 
-        return self.filter_empty(elements)
+    # ------------------------------------------------------------------
+    def _draw_footer(self, c: canvas.Canvas, page_num: int) -> None:
+        fy = self.FOOTER_H
+        mx = self.MARGIN_X
 
-    def build_sections(self, data: PDFData) -> List:
-        """Build code-styled section blocks."""
-        elements = []
-
-        for i, section in enumerate(data.sections):
-            if not section:
-                continue
-
-            section_elements = []
-
-            # Section title with code prefix
-            title_text = section.get('title')
-            if title_text:
-                prefixed_title = f"[SEC_{i:02d}] {title_text}"
-                section_elements.append(
-                    Paragraph(prefixed_title, self.styles['CyberSectionTitle'])
-                )
-
-            # Content
-            content = section.get('content')
-            if content:
-                if isinstance(content, list):
-                    for item in content:
-                        if item:
-                            section_elements.append(
-                                Paragraph(f"> {item}", self.styles['CyberBody'])
-                            )
-                else:
-                    section_elements.append(
-                        Paragraph(str(content), self.styles['CyberBody'])
-                    )
-
-            # Neon separator
-            if section_elements:
-                section_elements.append(Spacer(1, 4))
-                section_elements.append(HRFlowable(
-                    width="100%",
-                    thickness=0.5,
-                    color=self.COLORS['dark_gray'],
-                    spaceBefore=4,
-                    spaceAfter=4
-                ))
-                elements.append(KeepTogether(section_elements))
-
-        # ASCII Art block
-        if data.ascii_art:
-            elements.append(Spacer(1, 10))
-            elements.append(Paragraph(
-                data.ascii_art.replace(chr(10), '<br/>'),
-                self.styles['CyberCode']
-            ))
-            elements.append(Spacer(1, 10))
-
-        # Code blocks
-        for code_block in data.code_blocks:
-            if code_block.get('code'):
-                elements.append(Spacer(1, 8))
-                # Code block header
-                lang = code_block.get('language', 'RAW')
-                elements.append(Paragraph(
-                    f"// {lang} //",
-                    self.styles['CyberSectionTitle']
-                ))
-                # Code content
-                code_text = code_block['code'].replace(chr(10), '<br/>')
-                elements.append(Paragraph(
-                    code_text,
-                    self.styles['CyberCode']
-                ))
-                elements.append(Spacer(1, 8))
-
-        return elements
-
-    def build_table(self, data: PDFData) -> List:
-        """Build neon-styled data table."""
-        if not data.table:
-            return []
-
-        table_data = data.table.get('data', [])
-        headers = data.table.get('headers', [])
-
-        if not table_data and not headers:
-            return []
-
-        if headers:
-            display_data = [headers] + table_data
-        else:
-            display_data = table_data
-
-        if not display_data:
-            return []
-
-        num_cols = len(display_data[0]) if display_data else 1
-        col_width = (self.width - 2*inch) / num_cols
-
-        table = Table(display_data, colWidths=[col_width]*num_cols)
-
-        style_commands = [
-            ('FONTNAME', (0, 0), (-1, -1), 'Courier'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('TEXTCOLOR', (0, 0), (-1, 0), self.COLORS['bg']),
-            ('BACKGROUND', (0, 0), (-1, 0), self.COLORS['cyan']),
-            ('TEXTCOLOR', (0, 1), (-1, -1), self.COLORS['cyan']),
-            ('BACKGROUND', (0, 1), (-1, -1), self.COLORS['bg_alt']),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 0.5, self.COLORS['cyan']),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ]
-
-        table.setStyle(TableStyle(style_commands))
-
-        return [Spacer(1, 16), table, Spacer(1, 16)]
-
-    def build_background(self, canvas_obj, doc):
-        """Draw cyber grid background."""
-        canvas_obj.saveState()
-
-        # Black background
-        canvas_obj.setFillColor(self.COLORS['bg'])
-        canvas_obj.rect(0, 0, self.width, self.height, fill=1, stroke=0)
-
-        # Subtle grid pattern
-        canvas_obj.setStrokeColor(self.COLORS['dark_gray'])
-        canvas_obj.setLineWidth(0.2)
-
-        grid_spacing = 20
-        # Vertical lines
-        for x in range(0, int(self.width), grid_spacing):
-            canvas_obj.line(x, 0, x, self.height)
-
-        # Horizontal lines
-        for y in range(0, int(self.height), grid_spacing):
-            canvas_obj.line(0, y, self.width, y)
-
-        # Neon frame
-        canvas_obj.setStrokeColor(self.COLORS['cyan'])
-        canvas_obj.setLineWidth(1)
-        margin = 0.4*inch
-        canvas_obj.rect(margin, margin, 
-                       self.width - 2*margin, 
-                       self.height - 2*margin,
-                       fill=0, stroke=1)
-
-        # Corner accents
-        accent_len = 15
-        canvas_obj.setStrokeColor(self.COLORS['magenta'])
-        canvas_obj.setLineWidth(2)
-
-        # Top-left corner
-        canvas_obj.line(margin, self.height - margin, 
-                       margin + accent_len, self.height - margin)
-        canvas_obj.line(margin, self.height - margin, 
-                       margin, self.height - margin - accent_len)
-
-        # Top-right corner
-        canvas_obj.line(self.width - margin, self.height - margin,
-                       self.width - margin - accent_len, self.height - margin)
-        canvas_obj.line(self.width - margin, self.height - margin,
-                       self.width - margin, self.height - margin - accent_len)
-
-        # Bottom-left corner
-        canvas_obj.line(margin, margin, margin + accent_len, margin)
-        canvas_obj.line(margin, margin, margin, margin + accent_len)
-
-        # Bottom-right corner
-        canvas_obj.line(self.width - margin, margin,
-                       self.width - margin - accent_len, margin)
-        canvas_obj.line(self.width - margin, margin,
-                       self.width - margin, margin + accent_len)
-
-        canvas_obj.restoreState()
-
-    def build_footer_canvas(self, canvas_obj, doc, data: PDFData):
-        """Draw cyber footer with timestamp and hash ID."""
-        canvas_obj.saveState()
-        canvas_obj.setFont('Courier', 7)
-        canvas_obj.setFillColor(self.COLORS['gray'])
-
-        # Timestamp
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-        canvas_obj.drawString(0.75*inch, 0.4*inch, f"[TS] {timestamp}")
-
-        # Hash ID
-        hash_id = self._generate_hash_id()
-        canvas_obj.drawString(0.75*inch, 0.25*inch, f"[ID] {hash_id}")
+        # Top rule
+        c.setStrokeColor(self.C_LIGHT)
+        c.setLineWidth(0.8)
+        c.line(mx, fy, W - mx, fy)
 
         # Page number
-        page_text = f"PAGE_{doc.page:03d}"
-        canvas_obj.drawRightString(self.width - 0.75*inch, 0.4*inch, page_text)
+        c.setFont("Helvetica", 8)
+        c.setFillColor(self.C_MID)
+        c.drawCentredString(W / 2, fy - 5 * mm, f"Page {page_num}")
 
-        # Footer text or default
-        footer = data.footer_text or "Generated by PDF Engine v2.0"
-        canvas_obj.drawRightString(self.width - 0.75*inch, 0.25*inch, footer)
+        # Contact info left
+        contact = _safe(self.data, "contact")
+        if contact:
+            c.setFont("Helvetica", 8)
+            c.setFillColor(self.C_MID)
+            c.drawString(mx, fy - 5 * mm, contact)
 
-        # Neon bottom line
-        canvas_obj.setStrokeColor(self.COLORS['magenta'])
-        canvas_obj.setLineWidth(0.5)
-        canvas_obj.line(0.75*inch, 0.55*inch,
-                       self.width - 0.75*inch, 0.55*inch)
+        # Company right
+        company = _safe(self.data, "company")
+        if company:
+            c.setFont("Helvetica-Bold", 8)
+            c.setFillColor(self.C_ACCENT)
+            c.drawRightString(W - mx, fy - 5 * mm, company)
 
-        canvas_obj.restoreState()
+    # ------------------------------------------------------------------
+    def _draw_body(self, c: canvas.Canvas, y: float, new_page_cb) -> float:
+        mx    = self.MARGIN_X
+        right = W - self.MARGIN_X
+        body_w = right - mx
+        min_y  = self.FOOTER_H + 8 * mm
+
+        def check_space(needed: float) -> float:
+            nonlocal y
+            if y - needed < min_y:
+                c.showPage()
+                new_page_cb(c)
+                y = H - self.HEADER_H - self.MARGIN_Y
+            return y
+
+        # ---- Sections ----
+        sections = _safe(self.data, "sections", [])
+        for sec in sections:
+            heading = (sec.get("heading") or "").strip()
+            body    = (sec.get("body")    or "").strip()
+
+            if heading:
+                y = check_space(14 * mm)
+                c.setFont("Helvetica-Bold", 13)
+                c.setFillColor(self.C_ACCENT)
+                c.drawString(mx, y, heading)
+                y -= 3 * mm
+                # Thin rule under heading
+                c.setStrokeColor(self.C_LIGHT)
+                c.setLineWidth(0.8)
+                c.line(mx, y, right, y)
+                y -= 5 * mm
+
+            if body:
+                # Word-wrap body text manually
+                c.setFont("Helvetica", 10)
+                c.setFillColor(self.C_DARK)
+                for line in self._wrap_text(body, "Helvetica", 10, body_w):
+                    y = check_space(5 * mm)
+                    c.drawString(mx, y, line)
+                    y -= 4.5 * mm
+                y -= 4 * mm
+
+        # ---- Table ----
+        table_data_raw = _safe(self.data, "table")
+        if table_data_raw:
+            headers = table_data_raw.get("headers", [])
+            rows    = table_data_raw.get("rows", [])
+            if headers and rows:
+                y = check_space(20 * mm)
+                y = self._draw_table(c, headers, rows, mx, y, body_w, min_y,
+                                     new_page_cb)
+
+        return y
+
+    # ------------------------------------------------------------------
+    def _draw_table(self, c, headers, rows, x, y, width, min_y, new_page_cb):
+        col_n   = len(headers)
+        col_w   = width / col_n
+        row_h   = 7 * mm
+        pad_x   = 3 * mm
+
+        all_rows = [headers] + rows
+
+        for i, row in enumerate(all_rows):
+            if y - row_h < min_y:
+                c.showPage()
+                new_page_cb(c)
+                y = H - self.HEADER_H - self.MARGIN_Y
+
+            is_header = (i == 0)
+            is_alt    = (not is_header) and (i % 2 == 0)
+
+            # Row background
+            if is_header:
+                c.setFillColor(self.C_DARK)
+            elif is_alt:
+                c.setFillColor(self.C_ALT_ROW)
+            else:
+                c.setFillColor(self.C_WHITE)
+            c.rect(x, y - row_h, width, row_h, fill=1, stroke=0)
+
+            # Cell borders
+            c.setStrokeColor(self.C_LIGHT)
+            c.setLineWidth(0.5)
+            c.rect(x, y - row_h, width, row_h, fill=0, stroke=1)
+
+            # Text
+            for j, cell in enumerate(row[:col_n]):
+                cx = x + j * col_w + pad_x
+                if is_header:
+                    c.setFont("Helvetica-Bold", 9)
+                    c.setFillColor(self.C_WHITE)
+                else:
+                    c.setFont("Helvetica", 9)
+                    c.setFillColor(self.C_DARK)
+                c.drawString(cx, y - row_h + 2 * mm, str(cell))
+
+            y -= row_h
+
+        return y - 4 * mm
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _wrap_text(text: str, font: str, size: float, max_width: float) -> list[str]:
+        """Simple greedy word-wrapper using ReportLab string width."""
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        words  = text.split()
+        lines  = []
+        current = ""
+        for word in words:
+            test = (current + " " + word).strip()
+            if stringWidth(test, font, size) <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines
 
 
-# =============================================================================
-# PDF GENERATOR ENGINE
-# =============================================================================
+# ===========================================================================
+# 2.  DARK NEON MINIMAL STYLE  (formerly "Cyber")
+# ===========================================================================
 
-class PDFGenerator:
-    """Main PDF generation engine using strategy pattern."""
+class CyberStyle(BaseStyle):
+    """
+    Dark, modern, minimalistic with deliberate neon accents.
+    Palette: deep charcoal background, off-white text, neon green
+    primary accent, electric violet secondary, warm amber highlight.
+    No grids, no glitch, no clutter — just clean geometry and light.
+    """
 
-    def __init__(self, style_strategy: PDFStyleStrategy):
-        self.strategy = style_strategy
+    # --- palette ---
+    C_BG       = _hex("#0D0D0D")   # near-black background
+    C_SURFACE  = _hex("#161616")   # card / panel surface
+    C_BORDER   = _hex("#242424")   # subtle separator
+    C_TEXT     = _hex("#E8E8E8")   # primary text
+    C_MUTED    = _hex("#606060")   # secondary / meta text
+    C_NEON     = _hex("#AAFF4D")   # neon green — primary accent
+    C_VIOLET   = _hex("#8B5CF6")   # electric violet — secondary accent
+    C_AMBER    = _hex("#F59E0B")   # warm amber — highlight / warning
+    C_WHITE    = colors.white
 
-    def generate(self, data: PDFData, output_path: str) -> str:
-        """Generate PDF document."""
-        doc = SimpleDocTemplate(
-            output_path,
-            pagesize=self.strategy.pagesize,
-            rightMargin=0.75*inch,
-            leftMargin=0.75*inch,
-            topMargin=0.75*inch,
-            bottomMargin=0.75*inch
+    # --- layout ---
+    MARGIN_X = 20 * mm
+    MARGIN_Y = 14 * mm
+    HEADER_H = 32 * mm
+    FOOTER_H = 13 * mm
+
+    SANS      = "Helvetica-Bold"
+    SANS_REG  = "Helvetica"
+    MONO      = "Courier-Bold"
+    MONO_REG  = "Courier"
+
+    def build(self, output_path: str) -> None:
+        c = canvas.Canvas(output_path, pagesize=A4)
+        c.setTitle(_safe(self.data, "title", "Document"))
+
+        page_num = [0]
+
+        def draw_page(c: canvas.Canvas) -> None:
+            page_num[0] += 1
+            self._draw_background(c)
+            self._draw_header(c)
+            self._draw_footer(c, page_num[0])
+
+        draw_page(c)
+        self._draw_body(c, draw_page)
+        c.save()
+
+    # ------------------------------------------------------------------
+    def _draw_background(self, c: canvas.Canvas) -> None:
+        # Full-page dark fill
+        c.setFillColor(self.C_BG)
+        c.rect(0, 0, W, H, fill=1, stroke=0)
+
+        # Very faint horizontal scan-lines (4 pt gap) — subtle texture
+        c.setStrokeColor(self.C_SURFACE)
+        c.setLineWidth(0.5)
+        y = 0
+        while y <= H:
+            c.line(0, y, W, y)
+            y += 4
+
+        # Left neon accent strip — slim vertical bar
+        c.setFillColor(self.C_NEON)
+        c.rect(0, 0, 3, H, fill=1, stroke=0)
+
+        # Top-right corner decoration: two concentric quarter-circle arcs
+        cx_arc, cy_arc = W, H
+        c.setStrokeColor(self.C_VIOLET)
+        c.setLineWidth(0.6)
+        c.setStrokeAlpha(0.35)
+        c.arc(cx_arc - 60, cy_arc - 60, cx_arc + 60, cy_arc + 60, startAng=180, extent=90)
+        c.arc(cx_arc - 90, cy_arc - 90, cx_arc + 90, cy_arc + 90, startAng=180, extent=90)
+        c.setStrokeAlpha(1.0)
+
+        # Bottom-left mirrored decoration
+        c.setStrokeColor(self.C_NEON)
+        c.setLineWidth(0.4)
+        c.setStrokeAlpha(0.20)
+        c.arc(-50, -50, 50, 50, startAng=0, extent=90)
+        c.arc(-80, -80, 80, 80, startAng=0, extent=90)
+        c.setStrokeAlpha(1.0)
+
+    # ------------------------------------------------------------------
+    def _draw_header(self, c: canvas.Canvas) -> None:
+        mx = self.MARGIN_X
+        hy = self.HEADER_H
+
+        # Header surface panel
+        c.setFillColor(self.C_SURFACE)
+        c.rect(0, H - hy, W, hy, fill=1, stroke=0)
+
+        # Left accent re-draw on top of panel (keep it visible)
+        c.setFillColor(self.C_NEON)
+        c.rect(0, H - hy, 3, hy, fill=1, stroke=0)
+
+        # Neon dot marker before title
+        dot_x = mx + 2
+        dot_y = H - 16 * mm
+        c.setFillColor(self.C_NEON)
+        c.circle(dot_x, dot_y + 1.5, 2.8, fill=1, stroke=0)
+
+        # Title — clean sans-serif, white, generous size
+        title = _safe(self.data, "title", "UNTITLED")
+        c.setFont(self.SANS, 20)
+        c.setFillColor(self.C_TEXT)
+        c.drawString(dot_x + 7, dot_y, title)
+
+        # Subtitle — muted, smaller, below title
+        subtitle = _safe(self.data, "subtitle")
+        if subtitle:
+            c.setFont(self.SANS_REG, 10)
+            c.setFillColor(self.C_MUTED)
+            c.drawString(dot_x + 7, dot_y - 6 * mm, subtitle)
+
+        # Right-side meta block — date + reference stacked
+        right_x  = W - mx
+        meta_y   = H - 10 * mm
+        date_str = _safe(self.data, "date", datetime.now().strftime("%Y-%m-%d"))
+        ref_str  = _safe(self.data, "reference")
+
+        c.setFont(self.MONO_REG, 8)
+        c.setFillColor(self.C_NEON)
+        c.drawRightString(right_x, meta_y, date_str)
+        if ref_str:
+            c.setFillColor(self.C_MUTED)
+            c.drawRightString(right_x, meta_y - 4.5 * mm, ref_str)
+
+        # Separator — single pixel-thin line in neon
+        sep_y = H - hy + 0.5
+        c.setStrokeColor(self.C_NEON)
+        c.setLineWidth(0.8)
+        c.line(0, sep_y, W, sep_y)
+
+    # ------------------------------------------------------------------
+    def _draw_footer(self, c: canvas.Canvas, page_num: int) -> None:
+        mx = self.MARGIN_X
+        fy = self.FOOTER_H
+
+        # Footer surface
+        c.setFillColor(self.C_SURFACE)
+        c.rect(0, 0, W, fy, fill=1, stroke=0)
+
+        # Left accent strip in footer
+        c.setFillColor(self.C_NEON)
+        c.rect(0, 0, 3, fy, fill=1, stroke=0)
+
+        # Separator top
+        c.setStrokeColor(self.C_BORDER)
+        c.setLineWidth(0.6)
+        c.line(mx, fy, W - mx, fy)
+
+        # Left: generated-by label
+        c.setFont(self.MONO_REG, 7)
+        c.setFillColor(self.C_MUTED)
+        c.drawString(mx, fy / 2 - 1.5, "PDF ENGINE  ·  DARK NEON STYLE")
+
+        # Centre: page indicator with neon dot decoration
+        centre_text = f"{page_num:02d}"
+        c.setFont(self.SANS, 8)
+        c.setFillColor(self.C_TEXT)
+        c.drawCentredString(W / 2, fy / 2 - 1.5, centre_text)
+
+        # Right: hash / id
+        hash_id = _safe(self.data, "hash_id")
+        if not hash_id:
+            raw = _safe(self.data, "title", "PDF") + str(page_num)
+            hash_id = hashlib.sha256(raw.encode()).hexdigest()[:12].upper()
+        c.setFont(self.MONO_REG, 7)
+        c.setFillColor(self.C_VIOLET)
+        c.drawRightString(W - mx, fy / 2 - 1.5, hash_id)
+
+    # ------------------------------------------------------------------
+    def _draw_body(self, c: canvas.Canvas, new_page_cb) -> None:
+        mx     = self.MARGIN_X
+        right  = W - self.MARGIN_X
+        body_w = right - mx
+        y      = H - self.HEADER_H - self.MARGIN_Y
+        min_y  = self.FOOTER_H + 10 * mm
+
+        def check_space(needed: float) -> float:
+            nonlocal y
+            if y - needed < min_y:
+                c.showPage()
+                new_page_cb(c)
+                y = H - self.HEADER_H - self.MARGIN_Y
+            return y
+
+        # ---- ASCII Art block ----
+        ascii_art = _safe(self.data, "ascii_art")
+        if ascii_art:
+            lines   = ascii_art.splitlines()
+            line_h  = 3.8 * mm
+            pad     = 5 * mm
+            panel_h = len(lines) * line_h + pad * 2
+            y = check_space(panel_h + 4 * mm)
+
+            # Panel: surface background with neon left border
+            c.setFillColor(self.C_SURFACE)
+            c.rect(mx, y - panel_h, body_w, panel_h, fill=1, stroke=0)
+            c.setFillColor(self.C_NEON)
+            c.rect(mx, y - panel_h, 2.5, panel_h, fill=1, stroke=0)
+
+            ty = y - pad
+            for line in lines:
+                c.setFont(self.MONO_REG, 7.5)
+                c.setFillColor(self.C_NEON)
+                c.drawString(mx + 6 * mm, ty, line)
+                ty -= line_h
+            y -= panel_h + 6 * mm
+
+        # ---- Sections ----
+        sections = _safe(self.data, "sections", [])
+        for sec_idx, sec in enumerate(sections):
+            heading = (sec.get("heading") or "").strip()
+            body    = (sec.get("body")    or "").strip()
+
+            if heading:
+                y = check_space(14 * mm)
+
+                # Section index badge (01, 02 …)
+                badge = f"{sec_idx + 1:02d}"
+                c.setFont(self.MONO, 7)
+                c.setFillColor(self.C_NEON)
+                c.drawString(mx, y, badge)
+
+                # Heading text — white, bold, slightly indented
+                c.setFont(self.SANS, 12)
+                c.setFillColor(self.C_TEXT)
+                c.drawString(mx + 8 * mm, y, heading.upper())
+
+                y -= 4 * mm
+
+                # Full-width thin rule, neon left segment + muted rest
+                neon_w = 12 * mm
+                c.setStrokeColor(self.C_NEON)
+                c.setLineWidth(1.0)
+                c.line(mx, y, mx + neon_w, y)
+                c.setStrokeColor(self.C_BORDER)
+                c.setLineWidth(0.5)
+                c.line(mx + neon_w, y, right, y)
+
+                y -= 5 * mm
+
+            if body:
+                wrapped = self._wrap_text(body, self.SANS_REG, 9.5, body_w - 4 * mm)
+                needed  = len(wrapped) * 5 * mm + 4 * mm
+                y = check_space(needed)
+
+                c.setFont(self.SANS_REG, 9.5)
+                c.setFillColor(self.C_TEXT)
+                for line in wrapped:
+                    y = check_space(5 * mm)
+                    c.drawString(mx + 2 * mm, y, line)
+                    y -= 5 * mm
+
+                y -= 4 * mm  # breathing room between sections
+
+        # ---- Table ----
+        table_raw = _safe(self.data, "table")
+        if table_raw:
+            headers = table_raw.get("headers", [])
+            rows    = table_raw.get("rows", [])
+            if headers and rows:
+                y = check_space(20 * mm)
+                y = self._draw_dark_table(c, headers, rows, mx, y, body_w,
+                                          min_y, new_page_cb)
+
+    # ------------------------------------------------------------------
+    def _draw_dark_table(self, c, headers, rows, x, y, width, min_y, new_page_cb):
+        col_n   = len(headers)
+        col_w   = width / col_n
+        row_h   = 7.5 * mm
+        pad_x   = 3.5 * mm
+
+        all_rows = [headers] + rows
+
+        for i, row in enumerate(all_rows):
+            if y - row_h < min_y:
+                c.showPage()
+                new_page_cb(c)
+                y = H - self.HEADER_H - self.MARGIN_Y
+
+            is_header = (i == 0)
+            is_alt    = (not is_header) and (i % 2 == 0)
+
+            # Row fill
+            if is_header:
+                c.setFillColor(self.C_SURFACE)
+            elif is_alt:
+                c.setFillColor(_hex("#121212"))
+            else:
+                c.setFillColor(self.C_BG)
+            c.rect(x, y - row_h, width, row_h, fill=1, stroke=0)
+
+            # Bottom border only — cleaner than full box
+            c.setStrokeColor(self.C_BORDER)
+            c.setLineWidth(0.4)
+            c.line(x, y - row_h, x + width, y - row_h)
+
+            # Header: neon accent bar on top
+            if is_header:
+                c.setStrokeColor(self.C_NEON)
+                c.setLineWidth(1.2)
+                c.line(x, y, x + width, y)
+
+            for j, cell in enumerate(row[:col_n]):
+                cx = x + j * col_w + pad_x
+                ty = y - row_h + 2.5 * mm
+
+                if is_header:
+                    c.setFont(self.SANS, 7.5)
+                    c.setFillColor(self.C_NEON)
+                elif j == 0:
+                    # First column — slightly highlighted
+                    c.setFont(self.SANS_REG, 8)
+                    c.setFillColor(self.C_TEXT)
+                else:
+                    c.setFont(self.SANS_REG, 8)
+                    c.setFillColor(self.C_MUTED)
+
+                # Amber highlight for cells containing "CRITICAL" or "PWNED"
+                cell_str = str(cell)
+                if not is_header and any(
+                    kw in cell_str.upper()
+                    for kw in ("CRITICAL", "PWNED", "EXPLOITED", "HIGH")
+                ):
+                    c.setFillColor(self.C_AMBER)
+
+                c.drawString(cx, ty, cell_str)
+
+                # Vertical column divider (very subtle)
+                if j < col_n - 1:
+                    c.setStrokeColor(self.C_BORDER)
+                    c.setLineWidth(0.3)
+                    c.line(x + (j + 1) * col_w, y - row_h, x + (j + 1) * col_w, y)
+
+            y -= row_h
+
+        return y - 5 * mm
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _wrap_text(text: str, font: str, size: float, max_width: float) -> list[str]:
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        words   = text.split()
+        lines   = []
+        current = ""
+        for word in words:
+            test = (current + " " + word).strip()
+            if stringWidth(test, font, size) <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines
+
+
+# ===========================================================================
+# Registry + public entry point
+# ===========================================================================
+
+_STYLE_REGISTRY: dict[str, type[BaseStyle]] = {
+    "professional": ProfessionalStyle,
+    "cyber":        CyberStyle,
+}
+
+
+def register_style(name: str, cls: type[BaseStyle]) -> None:
+    """Register a custom style class under a given name."""
+    _STYLE_REGISTRY[name] = cls
+
+
+def generate_pdf(style: str, data: dict, output_path: str) -> str:
+    """
+    Generate a PDF document.
+
+    Parameters
+    ----------
+    style       : "professional" | "cyber"  (or any registered custom style)
+    data        : dict of content fields (see module docstring)
+    output_path : destination file path (.pdf)
+
+    Returns
+    -------
+    Absolute path of the written PDF.
+    """
+    style_key = style.lower().strip()
+    if style_key not in _STYLE_REGISTRY:
+        raise ValueError(
+            f"Unknown style '{style}'. Available: {list(_STYLE_REGISTRY)}"
         )
 
-        # Build content
-        story = []
-        story.extend(self.strategy.build_header(data))
-        story.extend(self.strategy.build_sections(data))
-        story.extend(self.strategy.build_table(data))
-
-        # Build function for page templates
-        def draw_background(canvas_obj, doc):
-            self.strategy.build_background(canvas_obj, doc)
-            self.strategy.build_footer_canvas(canvas_obj, doc, data)
-
-        # Build PDF
-        doc.build(story, onFirstPage=draw_background, onLaterPages=draw_background)
-
-        return output_path
-
-
-# =============================================================================
-# PUBLIC API
-# =============================================================================
-
-def generate_pdf(style: str, data: Dict[str, Any], output_path: str, 
-                 pagesize=A4) -> str:
-    """
-    Generate a PDF document with the specified style.
-
-    Args:
-        style: "professional" or "cyber"
-        data: Dictionary containing document data
-        output_path: Path for the output PDF file
-        pagesize: Page size (default A4)
-
-    Returns:
-        Path to the generated PDF file
-    """
-    pdf_data = PDFData.from_dict(data)
-
-    if style.lower() == "professional":
-        strategy = ProfessionalStyle(pagesize)
-    elif style.lower() == "cyber":
-        strategy = CyberStyle(pagesize)
-    else:
-        raise ValueError(f"Unknown style: {style}. Use 'professional' or 'cyber'.")
-
-    generator = PDFGenerator(strategy)
-    return generator.generate(pdf_data, output_path)
-
-
-# =============================================================================
-# EXAMPLE DATA
-# =============================================================================
-
-def get_professional_example_data() -> Dict[str, Any]:
-    """Return example data for professional style."""
-    return {
-        "title": "Quarterly Business Report",
-        "subtitle": "Q3 2026 Financial and Operational Summary",
-        "metadata": {
-            "Date": "October 15, 2026",
-            "Reference": "RPT-2026-Q3-001",
-            "Department": "Finance",
-            "Confidentiality": "Internal Use Only"
-        },
-        "sections": [
-            {
-                "title": "Executive Summary",
-                "content": [
-                    "Revenue increased by 24% compared to Q2 2026",
-                    "Operating costs reduced by 8% through automation initiatives",
-                    "Customer satisfaction score reached 94.2%",
-                    "Three new enterprise contracts signed worth $2.4M"
-                ]
-            },
-            {
-                "title": "Key Performance Indicators",
-                "content": [
-                    "Monthly Recurring Revenue (MRR): $485K (+18% YoY)",
-                    "Customer Acquisition Cost (CAC): $1,240 (-12% QoQ)",
-                    "Lifetime Value (LTV): $24,500 (+9% YoY)",
-                    "Net Promoter Score (NPS): 72 (+5 points)"
-                ]
-            },
-            {
-                "title": "Risk Assessment",
-                "content": "Current market volatility presents moderate risk to Q4 projections. "
-                          "Mitigation strategies include diversification of revenue streams and "
-                          "cost optimization programs."
-            }
-        ],
-        "table": {
-            "headers": ["Department", "Budget", "Actual", "Variance"],
-            "data": [
-                ["Engineering", "$1,200,000", "$1,150,000", "+4.2%"],
-                ["Marketing", "$800,000", "$820,000", "-2.5%"],
-                ["Sales", "$600,000", "$580,000", "+3.3%"],
-                ["Operations", "$400,000", "$390,000", "+2.5%"]
-            ]
-        },
-        "footer_text": "Acme Corporation | 123 Business Ave | contact@acme.com"
-    }
-
-
-def get_cyber_example_data() -> Dict[str, Any]:
-    """Return example data for cyber style."""
-    return {
-        "title": "SECURITY AUDIT REPORT",
-        "subtitle": "/// SYSTEM INTEGRITY ANALYSIS ///",
-        "metadata": {
-            "Target": "192.168.1.0/24",
-            "Scanner": "NEXUS-v9.2",
-            "Duration": "4h 23m 15s",
-            "Threat Level": "MEDIUM"
-        },
-        "sections": [
-            {
-                "title": "Network Topology",
-                "content": [
-                    "48 active hosts detected on subnet",
-                    "3 unauthorized devices flagged",
-                    "Firewall rules: 124/128 active",
-                    "VPN tunnel status: ENCRYPTED"
-                ]
-            },
-            {
-                "title": "Vulnerability Scan",
-                "content": [
-                    "CRITICAL: 0",
-                    "HIGH: 3 (CVE-2026-8841, CVE-2026-9902, CVE-2026-1123)",
-                    "MEDIUM: 12",
-                    "LOW: 28"
-                ]
-            },
-            {
-                "title": "Intrusion Detection",
-                "content": "Anomaly detected in packet flow at 03:42:15 UTC. "
-                          "Signature match: APT29 variant. Recommended action: "
-                          "Isolate segment 192.168.1.64/26 and initiate forensic capture."
-            }
-        ],
-        "table": {
-            "headers": ["PORT", "SERVICE", "VERSION", "STATUS"],
-            "data": [
-                ["22", "SSH", "OpenSSH 9.4", "FILTERED"],
-                ["80", "HTTP", "nginx 1.24", "OPEN"],
-                ["443", "HTTPS", "nginx 1.24", "OPEN"],
-                ["3306", "MySQL", "8.0.34", "CLOSED"],
-                ["8080", "Tomcat", "10.1.12", "OPEN"]
-            ]
-        },
-        "ascii_art": """
-    ███████╗███████╗ ██████╗██╗   ██╗██████╗ ██╗████████╗██╗   ██╗
-    ██╔════╝██╔════╝██╔════╝██║   ██║██╔══██╗██║╚══██╔══╝╚██╗ ██╔╝
-    ███████╗█████╗  ██║     ██║   ██║██████╔╝██║   ██║    ╚████╔╝ 
-    ╚════██║██╔══╝  ██║     ██║   ██║██╔══██╗██║   ██║     ╚██╔╝  
-    ███████║███████╗╚██████╗╚██████╔╝██║  ██║██║   ██║      ██║   
-    ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝   
-        """,
-        "code_blocks": [
-            {
-                "language": "PYTHON",
-                "code": """def scan_target(host, ports):
-    results = []
-    for port in ports:
-        if is_open(host, port):
-            service = identify_service(port)
-            results.append({
-                'port': port,
-                'service': service,
-                'status': 'VULNERABLE'
-            })
-    return results"""
-            },
-            {
-                "language": "BASH",
-                "code": """$ nmap -sV -sC -O 192.168.1.0/24
-Starting Nmap 7.94 ( https://nmap.org )
-Nmap scan report for 192.168.1.1
-Host is up (0.0003s latency).
-Not shown: 995 closed ports
-PORT    STATE SERVICE VERSION
-22/tcp  open  ssh     OpenSSH 9.4"""
-            }
-        ],
-        "footer_text": "/// CLASSIFIED - EYES ONLY ///"
-    }
-
-
-# =============================================================================
-# CLI INTERFACE
-# =============================================================================
-
-def main():
-    """CLI entry point for generating sample PDFs."""
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="PDF Document Generator with Professional and Cyber styles"
-    )
-    parser.add_argument(
-        "style",
-        choices=["professional", "cyber", "both"],
-        help="PDF style to generate"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        default="output.pdf",
-        help="Output file path (default: output.pdf)"
-    )
-    parser.add_argument(
-        "--data",
-        help="Path to JSON data file (optional, uses example data if not provided)"
-    )
-    parser.add_argument(
-        "--pagesize",
-        choices=["A4", "letter"],
-        default="A4",
-        help="Page size (default: A4)"
-    )
-
-    args = parser.parse_args()
-
-    pagesize = A4 if args.pagesize == "A4" else letter
-
-    # Load data from file or use examples
-    if args.data:
-        with open(args.data, 'r') as f:
-            data = json.load(f)
-    else:
-        data = None
-
-    styles_to_generate = []
-    if args.style == "both":
-        styles_to_generate = ["professional", "cyber"]
-    else:
-        styles_to_generate = [args.style]
-
-    for style in styles_to_generate:
-        if data is None:
-            if style == "professional":
-                doc_data = get_professional_example_data()
-            else:
-                doc_data = get_cyber_example_data()
-        else:
-            doc_data = data
-
-        if args.style == "both":
-            output_path = args.output.replace('.pdf', f'_{style}.pdf')
-        else:
-            output_path = args.output
-
-        try:
-            result = generate_pdf(style, doc_data, output_path, pagesize)
-            print(f"✓ Generated {style.upper()} PDF: {result}")
-        except Exception as e:
-            print(f"✗ Error generating {style} PDF: {e}")
-            sys.exit(1)
-
-    print("\nDone!")
-
-
-if __name__ == "__main__":
-    main()
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    renderer = _STYLE_REGISTRY[style_key](data)
+    renderer.build(output_path)
+    return os.path.abspath(output_path)
