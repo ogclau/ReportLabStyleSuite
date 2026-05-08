@@ -320,6 +320,4 @@ Python · ReportLab · Flask · Modular Architecture
 
 </div>
 
-Python · ReportLab · Flask · Modular Architecture
-
 </div>
