@@ -10,7 +10,7 @@
 ![PDF](https://img.shields.io/badge/PDF-ReportLab-ff6b6b?style=for-the-badge&labelColor=0d1117)
 ![Flask](https://img.shields.io/badge/Web-Flask-39ff6e?style=for-the-badge&labelColor=0d1117)
 ![Styles](https://img.shields.io/badge/Styles-2%20Themes-ff00ff?style=for-the-badge&labelColor=0d1117)
-[![Español](https://img.shields.io/badge/🌐-Español-orange?style=for-the-badge&labelColor=0d1117)](README.es.md)
+[![Español](https://img.shields.io/badge/Language-Español-orange?style=for-the-badge&labelColor=0d1117)](README.es.md)
 
 **Modular PDF Engine · Professional & Dark Neon Themes · Dynamic Web Form Studio · Flask Server · Built with ReportLab**
 
