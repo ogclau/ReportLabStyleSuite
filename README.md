@@ -29,6 +29,8 @@
 - [⌨ CLI](#-cli)
 - [🧱 Data Structure](#-data-structure)
 - [🖌 Extending with Custom Styles](#-extending-with-custom-styles)
+- [⚠️ Security Notice](#️-security-notice)
+- [📜 License & Usage Terms](#-license--usage-terms)
 - [📑 Requirements](#-requirements)
 
 ---
@@ -113,6 +115,8 @@ python form_app.py
 ```
 
 Then open **[http://localhost:5050](http://localhost:5050)** in your browser.
+
+> ⚠️ **Security Warning**: `form_app.py` runs a **local development server** (`debug=False`, no HTTPS, no authentication). It is intended **strictly for personal, offline use** on your own machine. **Do not expose this server to the public internet** or run it on open networks. There is no input sanitization beyond basic file-type checking, and uploaded files are stored in temporary directories. For production deployments, use a proper WSGI server (Gunicorn, uWSGI) behind a reverse proxy with TLS termination and authentication.
 
 ### Form panels
 
@@ -243,6 +247,63 @@ generate_pdf("retro", data, "retro_doc.pdf")
 
 ---
 
+## ⚠️ Security Notice
+
+> **🔒 Local Use Only**
+>
+> This project includes a Flask development server (`form_app.py`) intended **exclusively for local, personal use**. It is **not hardened for production** and lacks:
+> - HTTPS / TLS encryption
+> - Authentication or access control
+> - CSRF protection
+> - Rate limiting
+> - Comprehensive input validation
+>
+> **Never expose `form_app.py` to the public internet.** Always run it on `localhost` or within a trusted private network. Uploaded logos are stored in temporary files and deleted after generation, but no guarantees are made against malicious payloads.
+>
+> For any scenario beyond personal PDF generation on your own machine, deploy behind a reverse proxy (Nginx, Caddy) with TLS, use a production WSGI server, and implement proper authentication.
+
+---
+
+## 📜 License & Usage Terms
+
+This project is licensed under the **Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International** (CC BY-NC-ND 4.0).
+
+### What this means:
+
+| ✅ You CAN | ❌ You CANNOT |
+|---|---|
+| Use, download, and run this software for **personal, educational, or research purposes** | Use this software or its output for **commercial purposes** (selling, monetizing, or integrating into paid products/services) |
+| Share the original, unmodified source code with attribution | Create and share **modified versions** (derivatives) of this software |
+| Generate PDFs for personal or non-profit use | Remove or alter the attribution / copyright notices |
+| Reference this project in academic or educational contexts | Use the code as part of a commercial SaaS, agency service, or proprietary product |
+
+### Full Legal Text
+
+The complete license text is available in [`LICENSE`](LICENSE) or at:
+https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+
+### Attribution Requirement
+
+If you share this project, you must include:
+- The original author credit
+- A link to this repository
+- A notice that the material is licensed under CC BY-NC-ND 4.0
+- A link to the full license text
+
+### Commercial Licensing
+
+If you wish to use this project for **commercial purposes** — including but not limited to:
+- Integrating into a paid product or service
+- Using as part of client work or agency deliverables
+- Including in a SaaS platform
+- Redistributing modified versions
+
+**Please contact the author to discuss a separate commercial license.**
+
+> **TL;DR**: Free for personal use. Not free for business use. No remixing without permission. Attribution required.
+
+---
+
 ## 📑 Requirements
 
 - Python 3.10+
@@ -252,9 +313,13 @@ generate_pdf("retro", data, "retro_doc.pdf")
 ---
 
 <div align="center">
-    
+
 ![Visitors](https://hits.sh/github.com/ogclau/ReportLabStyleSuite.svg?style=for-the-badge&color=39ff6e&labelColor=0d1117)
-    
+
+Python · ReportLab · Flask · Modular Architecture
+
+</div>
+
 Python · ReportLab · Flask · Modular Architecture
 
 </div>
