@@ -16,7 +16,7 @@
 
 </div>
 
----
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:ff00ff,50:00d4ff,100:00ff88&height=3&section=footer&reversal=true" width="100%"/>
 
 ## 📚 INDEX
 
@@ -311,7 +311,7 @@ If you wish to use this project for **commercial purposes** — including but no
 - ReportLab 4.0+
 - Flask 3.0+ *(only required for the web form)*
 
----
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:ff00ff,50:00d4ff,100:00ff88&height=3&section=footer&reversal=true" width="100%"/>
 
 <div align="center">
 
