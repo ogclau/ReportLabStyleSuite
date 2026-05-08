@@ -4,7 +4,7 @@
 
 # PDF STYLE ENGINE · v2.0
 
-[![English](https://img.shields.io/badge/🌐-English-blue?style=for-the-badge&labelColor=0d1117)](README.md)
+[![English](https://img.shields.io/badge/Version-English-blue?style=for-the-badge&labelColor=0d1117)](README.md)
 ![Status](https://img.shields.io/badge/STATUS-ACTIVO-00ffff?style=for-the-badge&labelColor=0d1117)
 ![Python](https://img.shields.io/badge/Python-3.10+-ffd700?style=for-the-badge&labelColor=0d1117)
 ![PDF](https://img.shields.io/badge/PDF-ReportLab-ff6b6b?style=for-the-badge&labelColor=0d1117)
