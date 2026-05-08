@@ -1,3 +1,7 @@
+# PDF Style Engine v2.0
+# (c) 2025 Claudia Ortega
+# Licensed under CC BY-NC-ND 4.0
+# https://creativecommons.org/licenses/by-nc-nd/4.0/
 """
 form_app.py
 ===========
