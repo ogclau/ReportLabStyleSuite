@@ -5,7 +5,7 @@
 # PDF STYLE ENGINE · v2.0
 
 ![License](https://img.shields.io/badge/License-CC_BY--NC--ND_4.0-ff6b6b?style=for-the-badge&labelColor=0d1117)
-![Status](https://img.shields.io/badge/STATUS-ACTIVO-00ffff?style=for-the-badge&labelColor=0d1117)
+![Status](https://img.shields.io/badge/STATUS-ACTIVO-00ffef?style=for-the-badge&labelColor=0d1117)
 ![Python](https://img.shields.io/badge/Python-3.10+-ffd700?style=for-the-badge&labelColor=0d1117)
 ![PDF](https://img.shields.io/badge/PDF-ReportLab-ff6b6b?style=for-the-badge&labelColor=0d1117)
 ![Flask](https://img.shields.io/badge/Web-Flask-39ff6e?style=for-the-badge&labelColor=0d1117)
